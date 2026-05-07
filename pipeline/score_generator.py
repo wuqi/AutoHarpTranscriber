@@ -1,7 +1,7 @@
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from .models import (
     NoteEvent, UserConfig, HarmonicaType, ScoreType, HarmonicaNote, KEYS, NOTE_NAMES,
@@ -126,6 +126,80 @@ def _duration_suffix(beats: float) -> str:
         return ""
 
 
+def _build_score_lines(
+    notes: list[NoteEvent],
+    token_fn: Callable[[NoteEvent], str],
+    beat_duration: float,
+    beats_per_bar: int,
+) -> list[str]:
+    """Build Q: lines with proper rest insertion, bar placement, and note splitting.
+
+    Handles:
+    - Rests (0) when there are gaps between notes
+    - Notes that cross bar lines (split with correct durations)
+    - Line wrapping at ~70 characters
+    """
+    if not notes:
+        return ["Q: | 0 - - - |"]
+
+    EPS = 0.02  # tolerance in seconds (~20ms)
+
+    lines: list[str] = []
+    current_line = "Q: | "
+    bar_beats = 0.0
+    current_time = 0.0  # absolute time in seconds
+
+    def _emit_token(token_base: str, beats: float) -> None:
+        """Write one token into the current line, splitting at bar boundaries."""
+        nonlocal current_line, bar_beats
+
+        remaining = beats
+        while remaining > 0.005:
+            space = beats_per_bar - bar_beats
+            if remaining > space + 0.005:
+                chunk = space
+                remaining -= space
+            else:
+                chunk = remaining
+                remaining = 0
+
+            dur_suf = _duration_suffix(chunk)
+            current_line += f"{token_base}{dur_suf} "
+            bar_beats += chunk
+
+            if bar_beats >= beats_per_bar - 0.005:
+                # Close bar
+                current_line += "| "
+                if len(current_line) > 70:
+                    lines.append(current_line.rstrip())
+                    current_line = "Q: | "
+                bar_beats = 0.0
+
+    def _emit_rest(beats: float) -> None:
+        """Insert a 0 rest of the given beat duration."""
+        _emit_token("0", beats)
+
+    for note in notes:
+        # Insert rest for gap before this note
+        if note.start_time > current_time + EPS:
+            gap_beats = (note.start_time - current_time) / beat_duration
+            _emit_rest(gap_beats)
+
+        current_time = note.end_time
+        note_beats = note.duration / beat_duration
+        token = token_fn(note)
+        _emit_token(token, note_beats)
+
+    # Close remaining bar
+    stripped = current_line.strip()
+    if stripped != "Q: |":
+        if not stripped.endswith("|"):
+            current_line += "|"
+        lines.append(current_line.rstrip())
+
+    return lines if lines else ["Q: | 0 - - - |"]
+
+
 def generate_jianpu_score(
     notes: list[NoteEvent],
     key: str,
@@ -136,9 +210,6 @@ def generate_jianpu_score(
 
     Returns a list of Q: lines with bar lines inserted.
     """
-    if not notes:
-        return ["Q: | 0 - - - |"]
-
     # Determine tonic for movable-do
     key_name = key.rstrip("m")
     tonic_semitones = {"C": 0, "C#": 1, "D": 2, "D#": 3, "E": 4, "F": 5,
@@ -148,46 +219,13 @@ def generate_jianpu_score(
 
     beat_duration = 60.0 / tempo
 
-    # Parse time signature
     parts = time_sig.split("/")
     beats_per_bar = int(parts[0]) if len(parts) == 2 else 4
 
-    lines: list[str] = []
-    current_line = "Q: | "
-    bar_beats = 0.0
+    def token_fn(note: NoteEvent) -> str:
+        return midi_to_jianpu(note.pitch, tonic_midi)
 
-    for note in notes:
-        note_beats = note.duration / beat_duration
-        jianpu_note = midi_to_jianpu(note.pitch, tonic_midi)
-        dur_suffix = _duration_suffix(note_beats)
-        token = f"{jianpu_note}{dur_suffix}"
-
-        # Check if we need a new bar
-        if bar_beats + note_beats > beats_per_bar + 0.1:
-            # Close previous bar and start new one
-            current_line += " | "
-            bar_beats = 0.0
-
-        current_line += f"{token} "
-        bar_beats += note_beats
-
-        # Line wrapping at ~80 chars
-        if len(current_line) > 70:
-            current_line += "|"
-            lines.append(current_line)
-            current_line = "Q: | "
-            bar_beats = 0.0
-
-    # Close remaining bar
-    if current_line.strip() != "Q: |":
-        if not current_line.rstrip().endswith("|"):
-            current_line += "|"
-        lines.append(current_line)
-
-    if not lines:
-        return ["Q: | 0 - - - |"]
-
-    return lines
+    return _build_score_lines(notes, token_fn, beat_duration, beats_per_bar)
 
 
 def generate_harp_tab(
@@ -206,45 +244,16 @@ def generate_harp_tab(
     parts = time_sig.split("/")
     beats_per_bar = int(parts[0]) if len(parts) == 2 else 4
 
-    lines: list[str] = []
     unplayable: list[NoteEvent] = []
-    current_line = "Q: | "
-    bar_beats = 0.0
 
-    for note in notes:
-        note_beats = note.duration / beat_duration
-
+    def token_fn(note: NoteEvent) -> str:
         entry = mapping.get(note.pitch)
         if entry is None:
             unplayable.append(note)
-            token = "?"
-        else:
-            token = _format_harp_note(entry)
+            return "?"
+        return _format_harp_note(entry)
 
-        dur_suffix = _duration_suffix(note_beats)
-        token = f"{token}{dur_suffix}"
-
-        if bar_beats + note_beats > beats_per_bar + 0.1:
-            current_line += " | "
-            bar_beats = 0.0
-
-        current_line += f"{token} "
-        bar_beats += note_beats
-
-        if len(current_line) > 70:
-            current_line += "|"
-            lines.append(current_line)
-            current_line = "Q: | "
-            bar_beats = 0.0
-
-    if current_line.strip() != "Q: |":
-        if not current_line.rstrip().endswith("|"):
-            current_line += "|"
-        lines.append(current_line)
-
-    if not lines:
-        return ["Q: | ? - - - |"], unplayable
-
+    lines = _build_score_lines(notes, token_fn, beat_duration, beats_per_bar)
     return lines, unplayable
 
 
@@ -291,12 +300,21 @@ def build_markdown_output(
 
     from datetime import datetime
 
+    tonic_semitones = {"C": 0, "C#": 1, "D": 2, "D#": 3, "E": 4, "F": 5,
+                       "F#": 6, "G": 7, "G#": 8, "A": 9, "A#": 10, "B": 11}
+
     type_label = "十孔布鲁斯口琴" if harmonica_type == HarmonicaType.DIATONIC else "半音阶口琴"
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
 
     jianpu_key = original_key.rstrip("m")
-    # Handle sharp/flat for jianpu-spec D field
-    jianpu_key_d = jianpu_key.replace("#", "#").replace("b", "$")
+    # For minor keys, convert to relative major for the jianpu key signature.
+    # In jianpu (movable-do), 1=C means do=C; Am's relative major is C.
+    if original_key.endswith("m"):
+        minor_tonic_pc = tonic_semitones.get(jianpu_key, 0)
+        relative_major_pc = (minor_tonic_pc + 3) % 12
+        jianpu_key = KEYS[relative_major_pc]
+    # Handle flat for jianpu-spec D field ($ = flat)
+    jianpu_key_d = jianpu_key.replace("b", "$")
 
     lines = [
         f"# {audio_stem} - 口琴谱",

@@ -1,8 +1,14 @@
 {
   "permissions": {
     "allow": [
+      "Bash(git *)",
+      "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "Bash(echo \"EXIT:$?\")"
+      "Bash(python -c \"from pipeline.score_generator import _build_score_lines, generate_jianpu_score, generate_harp_tab, build_markdown_output, midi_to_jianpu; print\\('score_generator OK'\\)\")",
+      "Bash(python -c \"from pipeline.midi_writer import write_midi; print\\('midi_writer OK'\\)\")",
+      "Bash(python -c \"import json; d=json.load\\(open\\('knowledge/diatonic_c.json'\\)\\); print\\(f'diatonic: {len\\(d[\\\\\"mapping\\\\\"]\\)} entries'\\); od=[k for k,v in d[\\\\\"mapping\\\\\"].items\\(\\) if v.get\\(\\\\\"technique\\\\\"\\)==\\\\\"overdraw\\\\\"]; print\\(f'overdraw entries: {od}'\\)\")",
+      "Bash(python -c \"import json; d=json.load\\(open\\('knowledge/chromatic.json'\\)\\); print\\(f'chromatic: {len\\(d[\\\\\"mapping\\\\\"]\\)} entries, range: {d[\\\\\"lowest_midi\\\\\"]}-{d[\\\\\"highest_midi\\\\\"]}'\\)\")",
+      "Bash(python -c \"import json; json.load\\(open\\('knowledge/diatonic_c.json'\\)\\); print\\('JSON OK'\\)\")"
     ]
   }
 }

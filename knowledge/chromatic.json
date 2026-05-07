@@ -4,7 +4,7 @@
   "num_holes": 12,
   "description": "12孔半音阶口琴 (Solo tuning)",
   "lowest_midi": 60,
-  "highest_midi": 89,
+  "highest_midi": 96,
   "mapping": {
     "60": {"hole": 1, "action": "blow", "slide": false},
     "61": {"hole": 1, "action": "blow", "slide": true},
@@ -35,6 +35,13 @@
     "86": {"hole": 8, "action": "draw", "slide": false},
     "87": {"hole": 8, "action": "blow", "slide": false},
     "88": {"hole": 9, "action": "blow", "slide": false},
-    "89": {"hole": 9, "action": "draw", "slide": false}
+    "89": {"hole": 9, "action": "draw", "slide": false},
+    "90": {"hole": 10, "action": "draw", "slide": false},
+    "91": {"hole": 10, "action": "draw", "slide": true},
+    "92": {"hole": 10, "action": "blow", "slide": true},
+    "93": {"hole": 11, "action": "blow", "slide": false},
+    "94": {"hole": 11, "action": "blow", "slide": true},
+    "95": {"hole": 11, "action": "draw", "slide": false},
+    "96": {"hole": 12, "action": "blow", "slide": false}
   }
 }

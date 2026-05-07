@@ -9,7 +9,7 @@ def write_midi(notes: list[NoteEvent], output_path: Path, tempo: int, time_sig: 
     """
     import mido
 
-    mid = mido.MidiFile(ticks_per_beat=480)
+    mid = mido.MidiFile(ticks_per_beat=480, type=0)
     track = mido.MidiTrack()
     mid.tracks.append(track)
 
