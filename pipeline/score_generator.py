@@ -1,10 +1,9 @@
 import json
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Optional
 
 from .models import (
-    NoteEvent, UserConfig, HarmonicaType, ScoreType, HarmonicaNote, KEYS, NOTE_NAMES,
+    NoteEvent, HarmonicaType, ScoreType, HarmonicaNote, KEYS, KEY_SEMITONES,
 )
 
 _KNOWLEDGE_DIR = Path(__file__).parent.parent / "knowledge"
@@ -14,7 +13,7 @@ MAJOR_INTERVALS = [0, 2, 4, 5, 7, 9, 11]
 JIANPU_NUMBERS = ["1", "2", "3", "4", "5", "6", "7"]
 
 # Standard rhythm quantization targets (in beats)
-RHYTHM_TARGETS = [0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0]
+RHYTHM_TARGETS = [0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0, 6.0]
 
 
 def _load_mapping(harmonica_type: HarmonicaType, harp_key: str) -> dict[int, HarmonicaNote]:
@@ -33,9 +32,7 @@ def _load_mapping(harmonica_type: HarmonicaType, harp_key: str) -> dict[int, Har
     base_key = data["key"]
     mapping: dict[int, HarmonicaNote] = {}
 
-    base_semitones = {"C": 0, "C#": 1, "D": 2, "D#": 3, "E": 4, "F": 5,
-                      "F#": 6, "G": 7, "G#": 8, "A": 9, "A#": 10, "B": 11}
-    offset = (base_semitones.get(harp_key, 0) - base_semitones.get(base_key, 0)) % 12
+    offset = (KEY_SEMITONES.get(harp_key, 0) - KEY_SEMITONES.get(base_key, 0)) % 12
 
     for midi_str, entry in data["mapping"].items():
         midi = int(midi_str)
@@ -71,19 +68,12 @@ def midi_to_jianpu(pitch: int, tonic_midi: int) -> str:
         idx = MAJOR_INTERVALS.index(semitone_interval)
         base = JIANPU_NUMBERS[idx]
     except ValueError:
-        # Non-diatonic: find nearest and add accidental
-        # jianpu-spec: #/$ comes AFTER the note number (unlike JE format)
+        # Non-diatonic: find nearest diatonic note below and add #.
+        # Always use # (not $) to match FQ reference and MIDI convention.
+        # jianpu-spec: # comes AFTER the note number (unlike JE format)
         prev_interval = (semitone_interval - 1) % 12
-        if prev_interval in MAJOR_INTERVALS:
-            idx = MAJOR_INTERVALS.index(prev_interval)
-            base = f"{JIANPU_NUMBERS[idx]}#"
-        else:
-            next_interval = (semitone_interval + 1) % 12
-            if next_interval in MAJOR_INTERVALS:
-                idx = MAJOR_INTERVALS.index(next_interval)
-                base = f"{JIANPU_NUMBERS[idx]}$"
-            else:
-                base = f"{JIANPU_NUMBERS[(semitone_interval - 1) % 7]}#"
+        idx = MAJOR_INTERVALS.index(prev_interval)
+        base = f"{JIANPU_NUMBERS[idx]}#"
 
     # Octave markers
     if pitch >= tonic_midi:
@@ -122,8 +112,14 @@ def _duration_suffix(beats: float) -> str:
         return "--"
     elif abs(beats - 4.0) < eps:
         return "---"
+    elif abs(beats - 5.0) < eps:
+        return "----"
+    elif abs(beats - 6.0) < eps:
+        return "---."
     else:
-        return ""
+        # Fallback: use augmentation lines
+        n = round(beats) - 1
+        return "-" * max(n, 3)
 
 
 def _build_score_lines(
@@ -212,9 +208,7 @@ def generate_jianpu_score(
     """
     # Determine tonic for movable-do
     key_name = key.rstrip("m")
-    tonic_semitones = {"C": 0, "C#": 1, "D": 2, "D#": 3, "E": 4, "F": 5,
-                       "F#": 6, "G": 7, "G#": 8, "A": 9, "A#": 10, "B": 11}
-    tonic_pc = tonic_semitones.get(key_name, 0)
+    tonic_pc = KEY_SEMITONES.get(key_name, 0)
     tonic_midi = 60 + tonic_pc  # Tonic in octave 4
 
     beat_duration = 60.0 / tempo
@@ -285,6 +279,7 @@ def _format_harp_note(entry: HarmonicaNote) -> str:
 def build_markdown_output(
     audio_stem: str,
     original_key: str,
+    transposed_key: str,
     harp_key: str,
     harmonica_type: HarmonicaType,
     score_type: ScoreType,
@@ -293,24 +288,21 @@ def build_markdown_output(
     jianpu_lines: list[str],
     tab_lines: list[str],
     unplayable_notes: list[NoteEvent],
-    output_md: bool,
     output_mid: bool,
 ) -> str:
     """Build the complete markdown output following jianpu-spec conventions."""
 
     from datetime import datetime
 
-    tonic_semitones = {"C": 0, "C#": 1, "D": 2, "D#": 3, "E": 4, "F": 5,
-                       "F#": 6, "G": 7, "G#": 8, "A": 9, "A#": 10, "B": 11}
-
     type_label = "十孔布鲁斯口琴" if harmonica_type == HarmonicaType.DIATONIC else "半音阶口琴"
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-    jianpu_key = original_key.rstrip("m")
+    # D field uses the transposed key (the actual key of the notes in the score)
+    jianpu_key = transposed_key.rstrip("m")
     # For minor keys, convert to relative major for the jianpu key signature.
     # In jianpu (movable-do), 1=C means do=C; Am's relative major is C.
-    if original_key.endswith("m"):
-        minor_tonic_pc = tonic_semitones.get(jianpu_key, 0)
+    if transposed_key.endswith("m"):
+        minor_tonic_pc = KEY_SEMITONES.get(jianpu_key, 0)
         relative_major_pc = (minor_tonic_pc + 3) % 12
         jianpu_key = KEYS[relative_major_pc]
     # Handle flat for jianpu-spec D field ($ = flat)
@@ -325,7 +317,7 @@ def build_markdown_output(
         "| :--- | :--- |",
         f"| 原调 | {original_key} |",
         f"| 口琴类型 | {type_label} |",
-        f"| 使用口琴调性 | {harp_key}调 |",
+        f"| 推荐口琴 | {harp_key}调{type_label} |",
         f"| 拍号 | {time_sig} |",
         f"| 速度 | {tempo} BPM |",
         f"| 生成时间 | {now} |",
@@ -336,7 +328,7 @@ def build_markdown_output(
     lines.append("## 简谱正文（jianpu-spec 格式）")
     lines.append("")
     lines.append("```")
-    lines.append(f"V: 1.0")
+    lines.append("V: 1.0")
     lines.append(f"B: {audio_stem}")
     lines.append(f"D: {jianpu_key_d}")
     lines.append(f"P: {time_sig}")
@@ -369,17 +361,17 @@ def build_markdown_output(
         lines.append("```")
         lines.append("")
 
-    # Warnings for unplayable notes
-    if unplayable_notes:
-        uniq = {}
-        for n in unplayable_notes:
-            uniq[n.pitch_name] = uniq.get(n.pitch_name, 0) + 1
-        note_list = ", ".join(f"{name}(×{cnt})" for name, cnt in sorted(uniq.items()))
-        lines.append("> **注意**：以下音符无法在口琴上演奏：")
-        lines.append(f"> {note_list}")
-        lines.append("")
+        # Warnings for unplayable notes (only in harp tab mode)
+        if unplayable_notes:
+            uniq = {}
+            for n in unplayable_notes:
+                uniq[n.pitch_name] = uniq.get(n.pitch_name, 0) + 1
+            note_list = ", ".join(f"{name}(×{cnt})" for name, cnt in sorted(uniq.items()))
+            lines.append("> **注意**：以下音符无法在口琴上演奏：")
+            lines.append(f"> {note_list}")
+            lines.append("")
 
     if output_mid:
-        lines.append(f"> 打开同名 `.mid` 文件可试听扒谱效果。")
+        lines.append("> 打开同名 `.mid` 文件可试听扒谱效果。")
 
     return "\n".join(lines)

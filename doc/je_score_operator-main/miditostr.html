@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="./style.css">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="./midi.js"></script>
+    <script src="./fq.js"></script>
+    <script src="./je.js"></script>
+    <title>MIDI->je</title>
+</head>
+<script>
+    var songname = '';
+    var mi = [];       // midi class obj
+    var rawdata;
+    function fstream(file) {
+        songname = file.name.slice(0, -4);
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = function () {
+                rawdata = new Uint8Array(this.result);
+                mi = midi.import(rawdata);
+                resolve();
+            }
+            reader.onerror = () => {
+                mi = null;
+                reject();
+            };
+            reader.readAsArrayBuffer(file);
+        });
+    }
+    function download(data) {
+        let midfile = new Blob([data], { type: "application/octet-stream" });
+        let href = window.URL.createObjectURL(midfile);
+        let link = document.createElement('a');
+        link.href = href;
+        link.download = "newMIDI.mid";
+        link.click()
+    }
+    // 为了样式统一，将input:file替换成button
+    function registInputFile(inputFileDom) {
+        const btn = document.createElement('button');
+        btn.textContent = '选择文件';
+        btn.style.cssText = inputFileDom.style.cssText;
+        const onchange = inputFileDom.onchange;
+        const accept = inputFileDom.accept;
+        btn.className = inputFileDom.className;
+        btn.onclick = () => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = accept;
+            input.onchange = async (event) => {
+                await onchange.bind(input)(event);
+                btn.textContent = songname;
+            };
+            input.click();
+        }
+        inputFileDom.insertAdjacentElement('beforebegin', btn);
+        inputFileDom.remove();
+    }
+</script>
+
+<body>
+    <div class="center-div">
+        <input type="file" id="fin" accept=".mid" class="basicTheme darkbg" style="cursor: pointer; max-width: 100%;" onchange="fstream(this.files[0]);">
+        <button class="basicTheme" onclick="document.getElementById('out').value = JSON.stringify(mi.JSON(), undefined, 2);">midi事件解析</button>
+        <button class="basicTheme" onclick="readmidistr(rawdata);">16进制解读</button>
+    </div>
+    <div class="center-div">
+        <button class="basicTheme" onclick="outje(false)">转换为数字谱[分音轨]</button>
+        <button class="basicTheme" onclick="outje(true)">转换为数字谱[音轨合并]</button>
+        <div class="check-div"><input id='sametime' type="checkbox">同时演奏的音保留最高音</div>
+    </div>
+    <div class="center-div">
+        <div class="check-div"><input type="number" id="fqLine" value="4" class="basicTheme basicTheme-focus" style="width: 5em;">小节一行</div>
+        <button class="basicTheme" onclick="fq(parseInt(fqLine.value));">番茄简谱脚本(mid请尽可能规范)</button>
+        <a href="http://zhipu.lezhi99.com/Zhipu-index.html" target="_blank">前往番茄简谱</a>
+    </div>
+    <textarea id="out" class="basicTheme basicTheme-focus"
+        style="width: 80%;height: 400px;margin: 10px 10% 0 10%;"
+        placeholder="输出"></textarea>
+    <div class="center-div">
+        <button class="basicTheme" onclick="fq2je();">番茄简谱转换为数字谱</button>
+        <button class="basicTheme" onclick="fq2midi();">番茄简谱转换为MIDI</button>
+        <div class="check-div"><input id='fqStrict' type="checkbox">严格对齐小节</div>
+        <div class="check-div"><input id='fqSingleNoteAccidentals' type="checkbox" checked>临时升降号仅作用于单音</div>
+    </div>
+</body>
+<script>
+    registInputFile(document.getElementById('fin'));
+    // 16进制解读
+    function readmidistr(data, hex = false) {
+        let a = "";
+        if (hex) {
+            for (let i = 0; i < data.length; i++)
+                a = a + `,${data[i]}`;
+            a = a.substr(1);
+        } else {
+            for (let i = 0; i < data.length; i++)
+                a = a + data[i].toString(16) + " ";
+        }
+        document.getElementById("out").value = a;
+    }
+    // je谱输出
+    function outje(ifmix = false) {
+        if (!mi) {
+            alert("请选择文件！");
+            return;
+        }
+        let midi = mi.JSON();
+        let sametime = document.getElementById('sametime').checked;
+        function readtrack(track, ticks = midi.header.tick) {
+            let pu = "";
+            let together = false;
+            let shortest = ticks / 64;    // 短于这个时间则认为是同时
+            let ln = ticks * 1.4;         // 换行的界
+            let space = ticks * 0.8;      // 空格的界
+            let tick = ticks;
+            for (let i = 0; i < track.length; i++) {
+                let temp = together;
+                if (i != track.length - 1) {
+                    tick = track[i + 1].ticks - track[i].ticks;
+                    if (tick < shortest) {   // 同时
+                        if (sametime) continue;
+                        if (!together) {
+                            together = true;
+                            pu += '<';
+                        }
+                    } else {
+                        if (together) temp = true;      // 同时->不同时
+                    }
+                }
+
+                pu += JE.indexToje(track[i].midi - 60);
+                if (temp) {
+                    pu += '>';
+                    together = false;
+                }
+                if (!together) {
+                    if (tick >= ln) pu += '\n';
+                    else if (tick >= space) pu += ' ';
+                }
+            }
+            return pu;
+        }
+        let out = sametime ? '' : "<>表示里面的音符同时演奏\n";
+        if (ifmix) {
+            let mix = [];
+            for (let i = 0; i < midi.tracks.length; i++) {
+                mix = mix.concat(midi.tracks[i].notes);
+            }
+            mix.sort((a, b) => a.ticks == b.ticks ? a.midi - b.midi : a.ticks - b.ticks);
+            out += readtrack(mix);
+        } else {
+            for (let i = 0; i < midi.tracks.length; i++) {
+                out += `track ${i}:\n` + readtrack(midi.tracks[i].notes) + '\n';
+            }
+
+        }
+        document.getElementById('out').value = out;
+    }
+    // mid转为番茄简谱脚本
+    function fq(barNum = 4) {
+        mi.align(4);
+        document.getElementById('out').value = FQ.mid2fanqie(mi, barNum);
+    }
+    // 番茄简谱脚本转为数字谱
+    function fq2je() {
+        let fqstr = document.getElementById('out').value;
+        let fqobj = new FQ(fqstr, fqStrict.checked, fqSingleNoteAccidentals.checked);
+        document.getElementById('out').value = fqobj.toJE();
+    }
+    // 番茄简谱脚本转换为midi并下载
+    function fq2midi() {
+        let fqstr = document.getElementById('out').value;
+        let fqobj = new FQ(fqstr, fqStrict.checked, fqSingleNoteAccidentals.checked);
+        let mid = fqobj.toMidi();
+        download(mid.export());
+    }
+    /*====以下功能均未做接口====*/
+    // 翻转midi
+    function inverse(mid) {
+        let Mid = new midi(mid.bpm, [...mid.time_signature], mid.tick, [], mid.name);
+        for (let i = 0; i < mid.Mtrk.length; i++) {
+            let mt = mid.Mtrk[i];
+            mt.sort();
+            let a = Mid.addTrack();
+            a.name = mt.name;
+            mt = mt.events;
+            let endtick = mt[mt.length - 1].ticks;
+            for (let i = 0; i < mt.length; i++) {
+                if (mt[i].code == 0x9) {
+                    a.addEvent({
+                        ticks: endtick - mt[i].ticks,
+                        code: 0x9,
+                        value: [mt[i].value[0], mt[i].value[1] ? 0 : 100]
+                    })
+                }
+            }
+        }
+        return Mid;
+    }
+    // midi转调。x为升几个半音。负则降
+    function trans(x) {
+        let mtrk = mi.Mtrk;
+        for (let i = 0; i < mtrk.length; i++) {
+            let amtrk = mtrk[i].events;
+            for (let j = 0; j < amtrk.length; j++) {
+                if (amtrk[j].code == 9)
+                    amtrk[j].value[0] += x;
+            }
+        }
+        download(mi.export());
+    }
+</script>
+
+</html>

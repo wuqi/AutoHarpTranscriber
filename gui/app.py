@@ -73,8 +73,9 @@ def create_ui() -> gr.Blocks:
                 )
 
                 with gr.Row():
-                    output_md = gr.Checkbox(label="输出 Markdown 谱面 (.md)", value=True)
-                    output_mid = gr.Checkbox(label="输出 MIDI 试听文件 (.mid)", value=True)
+                    output_md = gr.Checkbox(label="输出 Markdown 谱面 (.md)", value=True, info="勾选后自动生成")
+                    output_mid = gr.Checkbox(label="输出 MIDI 试听文件 (.mid)", value=True, info="勾选后自动生成，仅用于试听")
+                    output_png = gr.Checkbox(label="输出简谱图片 (.png)", value=True, info="勾选后自动生成竖排数字简谱图片")
 
                 process_btn = gr.Button("开始生成", variant="primary", size="lg")
 
@@ -88,10 +89,11 @@ def create_ui() -> gr.Blocks:
 
                 md_output = gr.File(label="Markdown 谱面", visible=True)
                 mid_output = gr.File(label="MIDI 试听文件", visible=True)
+                png_output = gr.File(label="简谱图片", visible=True)
 
-        def process(audio_file, harm_type, score_t, key_strat, tgt_key, stem_ch, out_md, out_mid):
+        def process(audio_file, harm_type, score_t, key_strat, tgt_key, stem_ch, out_md, out_mid, out_png):
             if audio_file is None:
-                yield "请先选择音频文件", None, None
+                yield "请先选择音频文件", None, None, None
                 return
 
             config = UserConfig(
@@ -101,6 +103,7 @@ def create_ui() -> gr.Blocks:
                 target_key=tgt_key,
                 output_md=out_md,
                 output_mid=out_mid,
+                output_png=out_png,
                 stem_choice=StemChoice(stem_ch),
             )
 
@@ -133,7 +136,7 @@ def create_ui() -> gr.Blocks:
                     except queue.Empty:
                         break
                 if lines:
-                    yield "\n".join(lines), None, None
+                    yield "\n".join(lines), None, None, None
                 else:
                     thread.join(timeout=0.1)
 
@@ -150,7 +153,7 @@ def create_ui() -> gr.Blocks:
             ctx = result_ctx.get("ctx")
             if result_ctx.get("error"):
                 log_text += f"\n处理失败: {result_ctx['error']}"
-                yield log_text, None, None
+                yield log_text, None, None, None
                 return
 
             stem = audio_path.stem
@@ -158,13 +161,14 @@ def create_ui() -> gr.Blocks:
 
             md_file = str(output_dir / f"{stem}.md") if out_md and (output_dir / f"{stem}.md").exists() else None
             mid_file = str(output_dir / f"{stem}.mid") if out_mid and (output_dir / f"{stem}.mid").exists() else None
+            png_file = str(output_dir / f"{stem}.png") if out_png and (output_dir / f"{stem}.png").exists() else None
 
-            yield log_text, md_file, mid_file
+            yield log_text, md_file, mid_file, png_file
 
         process_btn.click(
             fn=process,
-            inputs=[audio_input, harmonica_type, score_type, key_strategy, target_key, stem_choice, output_md, output_mid],
-            outputs=[log_output, md_output, mid_output],
+            inputs=[audio_input, harmonica_type, score_type, key_strategy, target_key, stem_choice, output_md, output_mid, output_png],
+            outputs=[log_output, md_output, mid_output, png_output],
         )
 
     return app

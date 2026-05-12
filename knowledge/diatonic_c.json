@@ -33,7 +33,7 @@
     "84": {"hole": 7, "action": "blow", "technique": null},
     "85": {"hole": 7, "action": "draw", "technique": "overdraw"},
     "86": {"hole": 8, "action": "draw", "technique": null},
-    "87": {"hole": 8, "action": "blow", "technique": null},
+    "87": {"hole": 8, "action": "draw", "technique": "overdraw"},
     "88": {"hole": 8, "action": "blow", "technique": null},
     "89": {"hole": 9, "action": "draw", "technique": null},
     "90": {"hole": 9, "action": "draw", "technique": "overdraw"},

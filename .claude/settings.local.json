@@ -8,7 +8,31 @@
       "Bash(python -c \"from pipeline.midi_writer import write_midi; print\\('midi_writer OK'\\)\")",
       "Bash(python -c \"import json; d=json.load\\(open\\('knowledge/diatonic_c.json'\\)\\); print\\(f'diatonic: {len\\(d[\\\\\"mapping\\\\\"]\\)} entries'\\); od=[k for k,v in d[\\\\\"mapping\\\\\"].items\\(\\) if v.get\\(\\\\\"technique\\\\\"\\)==\\\\\"overdraw\\\\\"]; print\\(f'overdraw entries: {od}'\\)\")",
       "Bash(python -c \"import json; d=json.load\\(open\\('knowledge/chromatic.json'\\)\\); print\\(f'chromatic: {len\\(d[\\\\\"mapping\\\\\"]\\)} entries, range: {d[\\\\\"lowest_midi\\\\\"]}-{d[\\\\\"highest_midi\\\\\"]}'\\)\")",
-      "Bash(python -c \"import json; json.load\\(open\\('knowledge/diatonic_c.json'\\)\\); print\\('JSON OK'\\)\")"
+      "Bash(python -c \"import json; json.load\\(open\\('knowledge/diatonic_c.json'\\)\\); print\\('JSON OK'\\)\")",
+      "Bash(Get-ChildItem *)",
+      "Bash(py --version)",
+      "Bash(where python *)",
+      "Bash(py *)",
+      "Bash(findstr \"Location\")",
+      "Bash(wmic logicaldisk *)",
+      "Bash(findstr /v \"Caption\")",
+      "Bash(findstr \"Successfully\\\\|already\\\\|ERROR\")",
+      "Bash(cmd *)",
+      "Bash(d:\\\\miniconda3\\\\python.exe *)",
+      "PowerShell(& \"d:\\\\miniconda3\\\\python.exe\" --version)",
+      "PowerShell(& \"d:\\\\miniconda3\\\\python.exe\" -m pip install torch --index-url https://download.pytorch.org/whl/cpu 2>&1 | Select-Object -Last 5)",
+      "PowerShell(& \"d:\\\\miniconda3\\\\python.exe\" -m pip install Pillow demucs basic-pitch soundfile mido gradio numpy mido 2>&1 | Select-Object -Last 10)",
+      "PowerShell(& \"d:\\\\miniconda3\\\\python.exe\" -c \"import demucs; print\\('demucs', demucs.__version__\\)\" 2>&1; & \"d:\\\\miniconda3\\\\python.exe\" -c \"import basic_pitch; print\\('basic_pitch ok'\\)\" 2>&1; & \"d:\\\\miniconda3\\\\python.exe\" -c \"import mido; print\\('mido ok'\\)\" 2>&1; & \"d:\\\\miniconda3\\\\python.exe\" -c \"import gradio; print\\('gradio ok'\\)\" 2>&1)",
+      "PowerShell(& \"d:\\\\miniconda3\\\\python.exe\" -m pip install mido 2>&1 | Select-Object -Last 3)",
+      "PowerShell(& \"d:\\\\miniconda3\\\\python.exe\" -m pip install basic-pitch 2>&1 | Select-Object -Last 5)",
+      "PowerShell(& \"d:\\\\miniconda3\\\\python.exe\" -m pip install --upgrade setuptools 2>&1 | Select-Object -Last 3)",
+      "PowerShell(& \"d:\\\\miniconda3\\\\python.exe\" -m pip install \"basic-pitch>=0.4.0\" --no-deps 2>&1 | Select-Object -Last 3)",
+      "PowerShell(& \"d:\\\\miniconda3\\\\python.exe\" -m pip install \"git+https://github.com/facebookresearch/demucs.git\" 2>&1 | Select-Object -Last 5)",
+      "PowerShell(& \"d:\\\\miniconda3\\\\python.exe\" -m pip install \"git+https://github.com/facebookresearch/demucs.git\" --no-deps 2>&1 | Select-Object -Last 3)",
+      "PowerShell(& \"d:\\\\miniconda3\\\\python.exe\" -c \"import demucs.api; print\\('demucs.api OK'\\); import basic_pitch; print\\('basic_pitch OK'\\); import mido; print\\('mido OK'\\); import PIL; print\\('Pillow OK'\\)\")",
+      "PowerShell(& \"d:\\\\miniconda3\\\\python.exe\" -m pip install dora-search 2>&1 | Select-Object -Last 3)",
+      "PowerShell(& \"d:\\\\miniconda3\\\\python.exe\" -m pip install julius lameenc 2>&1 | Select-Object -Last 3)",
+      "PowerShell(& \"d:\\\\miniconda3\\\\python.exe\" -c \"import demucs.api; print\\('demucs.api OK'\\); import basic_pitch; print\\('basic_pitch OK'\\); import mido; print\\('mido OK'\\); import PIL; print\\('Pillow OK'\\); import soundfile; print\\('soundfile OK'\\)\")"
     ]
   }
 }

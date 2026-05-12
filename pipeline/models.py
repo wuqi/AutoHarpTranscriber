@@ -31,12 +31,6 @@ KEY_SEMITONES = {k: i for i, k in enumerate(KEYS)}
 
 NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
-# jianpu-spec uses $ for flat, # for sharp
-KEY_TO_JIANPU = {
-    "C": "C", "C#": "C#", "D": "D", "D#": "D#", "E": "E",
-    "F": "F", "F#": "F#", "G": "G", "G#": "G#", "A": "A", "A#": "A#", "B": "B",
-}
-
 # Diatonic harmonica keys and how many semitones their layout is shifted from C
 DIATONIC_HARP_KEYS = {
     "C": 0, "C#": 1, "D": 2, "D#": 3, "E": 4, "F": 5, "F#": 6,
@@ -70,6 +64,7 @@ class UserConfig:
     target_key: str = "C"
     output_md: bool = True
     output_mid: bool = True
+    output_png: bool = True
     stem_choice: StemChoice = StemChoice.AUTO
 
 
@@ -92,6 +87,7 @@ class PipelineContext:
 
     # Key analysis results
     original_key: Optional[str] = None
+    transposed_key: Optional[str] = None
     recommended_harp_key: Optional[str] = None
     harp_key_used: Optional[str] = None
     transposed_notes: list[NoteEvent] = field(default_factory=list)

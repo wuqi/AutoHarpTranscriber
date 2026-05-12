@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="./style.css">
+    <script src="./je.js"></script>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>蔽夏转调器！</title>
+</head>
+<style>
+    .minWidth-select {
+        min-width: 10.5em;
+    }
+
+    @media (max-width: 600px) {
+        .minWidth-select {
+            min-width: 0;
+        }
+    }
+
+    #sharpModePanel {
+        background-color: var(--dombg-light);
+        padding: 0.4em;
+        border-radius: 0.4em;
+        position: relative;
+    }
+
+    #sharpModePanel::before {
+        content: '';
+        width: 1em;
+        height: 1em;
+        top: -0.5em;
+        transform: translateX(3em) rotate(45deg);
+        background-color: var(--dombg-light);
+        position: absolute;
+    }
+</style>
+<script>
+    var semiMode = null;
+    window.addEventListener('load', () => {
+        semiMode = document.getElementById('semiMode');
+        semiMode._semiMode = true;
+        Object.defineProperty(semiMode, 'semiMode', {
+            get: function () { return this._semiMode; },
+            set: function (mode) {
+                this._semiMode = mode;
+                if (mode) {
+                    this.classList.remove('darkbg');
+                    this.classList.add('lightbg');
+                    this.textContent = '当前半音: #';
+                } else {
+                    this.classList.remove('lightbg');
+                    this.classList.add('darkbg');
+                    this.textContent = '当前半音: b';
+                }
+            }
+        });
+        const sharpModePanel = document.getElementById('sharpModePanel');
+        sharpModePanel._semiMode = true;
+        Object.defineProperty(sharpModePanel, 'semiMode', {
+            get: function () { return this._semiMode; },
+            set: function (mode) { this.style.display = (this._semiMode = mode) ? 'flex' : 'none'; }
+        });
+    });
+</script>
+
+<body>
+    <!-- 结果区 -->
+    <div>
+        <textarea onchange='printExtreme();' id="before"
+            placeholder="这里输入je谱ˋ( ° ▽、° )&#13;&#10;注：&#13;&#10;◉ (低音) 中音 [高音]，括号可嵌套 #升半音 b降半音&#13;&#10;◉ E调→C调 ⇔ 1→3&#13;&#10;◉ 1=#C是口琴的记谱方式，这里用降记号代替还原号&#13;&#10;◉ “自动升记号”会根据上一个音符决定用4/#3、1/#7"
+            class="basicTheme basicTheme-focus"
+            style="width: 90%; height: 320px; margin: 10px auto 20px auto;"></textarea>
+        <p id="situation" style="text-align: center; color: var(--dombg-dark);">最高音：? 最低音：？</p>
+    </div>
+    <div>
+        <!-- 升降多少 -->
+        <div class="center-div">
+            <select id="selectNote" class="basicTheme basicTheme-focus">
+                <option value="-1" selected="selected">所有音</option>
+                <option value="0">所有do(不含#1)</option>
+                <option value="2">所有re</option>
+                <option value="4">所有mi</option>
+                <option value="5">所有fa</option>
+                <option value="7">所有so</option>
+                <option value="9">所有la</option>
+                <option value="11">所有si</option>
+            </select>
+            <select id="updown" class="basicTheme basicTheme-focus">
+                <option value="1" selected="selected">升</option>
+                <option value="-1">降</option>
+            </select>
+            <input id="howmany" placeholder="这里输入升/降多少半音" class="basicTheme basicTheme-focus"
+                onkeyup="this.value=this.value.replace(/[^0-9]/g,'');"></input>
+            <button onclick="byNum();printExtreme();lessbrackets();" class="basicTheme darkbg blod">转换</button>
+        </div>
+        <!-- 按调性转 -->
+        <div class="center-div">
+            <div>
+                <span class="intro">转换前的调</span>
+                <select id="beforemode" class="Select-input basicTheme basicTheme-focus minWidth-select">
+                    <option value="0" selected="selected">1 = C</option>
+                    <option value="1">1 = #C</option>
+                    <option value="2">1 = D</option>
+                    <option value="3">1 = #D</option>
+                    <option value="4">1 = E</option>
+                    <option value="5">1 = F</option>
+                    <option value="6">1 = #F</option>
+                    <option value="7">1 = G</option>
+                    <option value="8">1 = #G</option>
+                    <option value="9">1 = A</option>
+                    <option value="10">1 = #A</option>
+                    <option value="11">1 = B</option>
+                </select>
+            </div>
+            <div>
+                <span class="intro">转换后的调</span>
+                <select id="aftermode" class="Select-input basicTheme basicTheme-focus minWidth-select">
+                    <option value="0" selected="selected">1 = C</option>
+                    <option value="1">1 = #C</option>
+                    <option value="2">1 = D</option>
+                    <option value="3">1 = #D</option>
+                    <option value="4">1 = E</option>
+                    <option value="5">1 = F</option>
+                    <option value="6">1 = #F</option>
+                    <option value="7">1 = G</option>
+                    <option value="8">1 = #G</option>
+                    <option value="9">1 = A</option>
+                    <option value="10">1 = #A</option>
+                    <option value="11">1 = B</option>
+                </select>
+            </div>
+            <div>
+                <span class="intro">&nbsp;</span>
+                <button onclick="byTon();printExtreme();lessbrackets();" class="basicTheme darkbg blod">转换</button>
+            </div>
+        </div>
+        <!-- 最音转换 -->
+        <div class="center-div">
+            <select id='extremeMode' class="basicTheme basicTheme-focus">
+                <option value="0">最低音</option>
+                <option value="1">最高音</option>
+            </select>
+            <span style="font-size: 1.3em;">为</span>
+            <input id="target" placeholder="请按je谱格式输入目标音" class="basicTheme basicTheme-focus"></input>
+            <button onclick='toExtreme();printExtreme();' class="basicTheme darkbg blod">转换</button>
+        </div>
+        <!-- 其他工具 -->
+        <div class="center-div">
+            <button onclick="naturalShow();printExtreme();lessbrackets();" class="basicTheme darkbg">1=#C记谱</button>
+            <button onclick="toMin();printExtreme();lessbrackets();" class="basicTheme darkbg">一键最简</button>
+            <button onclick="switchSemiMode();" id="semiMode" class="basicTheme lightbg">当前半音: #</button>
+            <div class="check-div"><input type="checkbox" id="lessbrackets" checked>更少括号</div>
+        </div>
+        <!-- 半音模式: #模式的面板 -->
+        <div class="center-div" id="sharpModePanel" style="display: flex;">
+            <!-- UI保证了当前处于#模式，故不做过多判断 -->
+            <div class="check-div"><input type="checkbox" onchange="Note_aft[5] = this.checked?'#3':'4'">4→#3</div>
+            <div class="check-div"><input type="checkbox" onchange="Note_aft[0] = this.checked?'(#7)':'1'">[1]→#7</div>
+            <div class="check-div"><input type="checkbox" id="autoup">自动升记号<br>(口琴专用)</div>
+        </div>
+    </div>
+</body>
+<script>
+    const upNotes = [...JE.upNotes];
+    const downNotes = [...JE.downNotes];
+    var Note_aft = upNotes;       // 转换后每个音怎么显示
+
+    function byNum() {
+        let x = document.getElementById("howmany").value;
+        x = Number(x) * document.getElementById("updown").value;
+        let n = document.getElementById('selectNote').value;
+        let autoup = document.getElementById('autoup').checked & semiMode.semiMode;
+        const before = document.getElementById("before");
+        if (n >= 0) {
+            let tempnote = [...Note_aft]
+            tempnote[n] = JE.convert(tempnote[n], x, Note_aft, false);
+            before.value = JE.convert(before.value, 0, tempnote, autoup);
+        } else {
+            before.value = JE.convert(before.value, x, Note_aft, autoup);
+        }
+    }
+    function toMin() {
+        const before = document.getElementById("before");
+        before.value = JE.simplified(before.value);
+    }
+    function byTon() {
+        let x = document.getElementById("beforemode").value - document.getElementById("aftermode").value;
+        let autoup = document.getElementById('autoup').checked & semiMode.semiMode;
+        if (x < -5.5) x += 12;
+        else if (x > 6.5) x = x - 12;
+        const before = document.getElementById("before");
+        before.value = JE.convert(before.value, x, Note_aft, autoup);
+    }
+    function naturalShow() {
+        const before = document.getElementById("before");
+        let x = JE.convert(before.value, -1);
+        var a = ['#1', '#2', '#4', '#5', '#6'];
+        var b = ['b2', 'b3', 'b5', 'b6', 'b7'];
+        for (let i = 0; i < 5; i++) {
+            x = x.replace(new RegExp(a[i], 'gm'), b[i]);
+        }
+        before.value = x;
+    }
+    function switchSemiMode() {
+        const sharpModePanel = document.getElementById('sharpModePanel');
+        const semiMode = document.getElementById('semiMode');
+        Note_aft = (semiMode.semiMode = sharpModePanel.semiMode = !semiMode.semiMode) ? upNotes : downNotes;
+        const before = document.getElementById("before");
+        let autoup = document.getElementById('autoup').checked & semiMode.semiMode;
+        before.value = JE.convert(before.value, 0, Note_aft, autoup);
+        printExtreme(); lessbrackets();
+    }
+    function toExtreme() {
+        let y = JE.findExtreme(document.getElementById("target").value)[document.getElementById("extremeMode").value];
+        if (y == 0.1) alert("请按je谱格式输入！");
+        else {
+            const before = document.getElementById("before");
+            let x = JE.findExtreme(before.value)[document.getElementById("extremeMode").value];
+            let autoup = document.getElementById('autoup').checked & semiMode.semiMode;
+            before.value = JE.convert(before.value, y - x, Note_aft, autoup);
+        }
+    }
+    function printExtreme() {
+        let x = JE.findExtreme(document.getElementById("before").value);
+        let h = JE.indexToje(x[0], Note_aft); if (!h) h = '?';
+        let l = JE.indexToje(x[1], Note_aft); if (!l) l = '?';
+        document.getElementById("situation").innerHTML = `最低音：${h}   最高音：${l}`;
+    }
+    function lessbrackets() {
+        const dom = document.getElementById("before");
+        dom.value = dom.value.replace(/\[\(/g, '').replace(/\)\]/g, '');
+        if (document.getElementById('lessbrackets').checked)
+            dom.value = dom.value.replace(/\]\[/g, '').replace(/\)\(/g, '').replace(/\]\[/g, '').replace(/\)\(/g, '')
+    }
+</script>
+
+</html>
